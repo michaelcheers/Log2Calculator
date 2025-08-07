@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log2calendar</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background-color: #fff;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        h1, h2 {
+            color: #1a1a1a;
+        }
+
+        #auth-section, #events-dashboard {
+            margin-top: 1.5rem;
+        }
+
+        input[type="file"], input[type="text"], button {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin: 8px 0;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #event-list {
+            list-style-type: none;
+            padding: 0;
+            text-align: left;
+        }
+
+        #event-list li {
+            background-color: #e9ecef;
+            margin-bottom: 10px;
+            padding: 15px;
+            border-radius: 4px;
+            font-size: 1.1rem;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Log2calendar</h1>
+        <p>A minimalist calendar dashboard using logarithmic time units.</p>
+
+        <div id="auth-section">
+            <p>Please upload your Google OAuth client credentials JSON file.</p>
+            <input type="file" id="credentials-file-input" accept=".json">
+            <button id="authenticate-button">Authenticate</button>
+            <div id="auth-info" style="display:none;">
+                <p>Follow the Google OAuth flow. When redirected, copy the full URL and paste it below:</p>
+                <input type="text" id="redirect-url-input" placeholder="Paste redirect URL here">
+                <button id="process-token-button">Process Token</button>
+            </div>
+        </div>
+
+        <div id="events-dashboard" style="display:none;">
+            <h2>Upcoming Events</h2>
+            <ul id="event-list"></ul>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const credentialsFileInput = document.getElementById('credentials-file-input');
+            const authenticateButton = document.getElementById('authenticate-button');
+            const authInfo = document.getElementById('auth-info');
+            const redirectUrlInput = document.getElementById('redirect-url-input');
+            const processTokenButton = document.getElementById('process-token-button');
+            const authSection = document.getElementById('auth-section');
+            const eventsDashboard = document.getElementById('events-dashboard');
+            const eventList = document.getElementById('event-list');
+
+            const redirectUri = 'https://localhost:2853';
+            const googleAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
+
+            let clientId = localStorage.getItem('googleClientId');
+            let clientSecret = localStorage.getItem('googleClientSecret');
+            let accessToken = localStorage.getItem('googleAccessToken');
+
+            // Show the next step if credentials are already stored
+            if (clientId && clientSecret) {
+                authInfo.style.display = 'block';
+            }
+
+            // Event listener for reading and saving the JSON credentials file
+            authenticateButton.addEventListener('click', () => {
+                const file = credentialsFileInput.files[0];
+                if (!file) {
+                    alert('Please select a JSON file to upload.');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const credentials = JSON.parse(event.target.result);
+                        clientId = credentials.client_id;
+                        clientSecret = credentials.client_secret;
+
+                        if (clientId && clientSecret) {
+                            localStorage.setItem('googleClientId', clientId);
+                            localStorage.setItem('googleClientSecret', clientSecret);
+                            authInfo.style.display = 'block';
+                            initiateOAuthFlow(clientId);
+                        } else {
+                            alert('Invalid credentials file format. Please ensure it contains client_id and client_secret.');
+                        }
+                    } catch (e) {
+                        alert('Failed to parse JSON file.');
+                    }
+                };
+                reader.readAsText(file);
+            });
+
+            // Event listener for processing the redirect URL and extracting the token
+            processTokenButton.addEventListener('click', () => {
+                const url = redirectUrlInput.value;
+                try {
+                    const fragment = new URL(url).hash;
+                    const params = new URLSearchParams(fragment.substring(1));
+                    const token = params.get('access_token');
+                    if (token) {
+                        localStorage.setItem('googleAccessToken', token);
+                        accessToken = token;
+                        alert('Authentication successful!');
+                        initApp();
+                    } else {
+                        alert('Could not find access token in URL fragment.');
+                    }
+                } catch (e) {
+                    alert('Invalid URL format.');
+                }
+            });
+
+            // Main function to check for tokens and start the app
+            function initApp() {
+                if (accessToken) {
+                    authSection.style.display = 'none';
+                    eventsDashboard.style.display = 'block';
+                    fetchCalendarEvents();
+                    // Refresh every minute to update the time
+                    setInterval(fetchCalendarEvents, 60 * 1000);
+                }
+            }
+
+            // Function to initiate the Google OAuth flow
+            function initiateOAuthFlow(clientId) {
+                const scope = 'https://www.googleapis.com/auth/calendar.readonly';
+                const authUrl = `${googleAuthUrl}?response_type=token&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
+                window.open(authUrl, '_blank');
+            }
+
+            // Function to fetch events from Google Calendar
+            async function fetchCalendarEvents() {
+                if (!accessToken) return;
+
+                const now = new Date();
+                const timeMin = now.toISOString();
+                const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin}&maxResults=10&singleEvents=true&orderBy=startTime`;
+
+                try {
+                    const response = await fetch(url, {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`
+                        }
+                    });
+                    const data = await response.json();
+                    
+                    if (data.items) {
+                        displayEvents(data.items);
+                    } else {
+                        eventList.innerHTML = '<li>No upcoming events found.</li>';
+                    }
+                } catch (error) {
+                    console.error('Error fetching calendar events:', error);
+                    eventList.innerHTML = '<li>Failed to load events. Please re-authenticate.</li>';
+                    localStorage.removeItem('googleAccessToken');
+                    accessToken = null;
+                    authSection.style.display = 'block';
+                    eventsDashboard.style.display = 'none';
+                }
+            }
+
+            // Function to display the fetched events
+            function displayEvents(events) {
+                eventList.innerHTML = ''; // Clear previous events
+                const now = new Date();
+                
+                events.forEach(event => {
+                    const startTime = new Date(event.start.dateTime);
+                    if (startTime > now) {
+                        const logTime = calculateLog2Time(now, startTime);
+                        const listItem = document.createElement('li');
+                        listItem.textContent = `${logTime} left for: ${event.summary}`;
+                        eventList.appendChild(listItem);
+                    }
+                });
+                
+                if (eventList.children.length === 0) {
+                    eventList.innerHTML = '<li>No upcoming events found.</li>';
+                }
+            }
+
+            // Core function to calculate and format the log2 time
+            function calculateLog2Time(now, eventTime) {
+                const deltaMilliseconds = eventTime - now;
+                const deltaMinutes = deltaMilliseconds / (1000 * 60);
+
+                if (deltaMinutes <= 0) {
+                    return 'Event in progress';
+                }
+                
+                const log2Minutes = Math.log2(deltaMinutes);
+                const roundedLog2 = log2Minutes.toFixed(1);
+                
+                let formattedTime;
+                if (roundedLog2 >= 10.0) {
+                    const integerPart = Math.floor(roundedLog2);
+                    const decimalPart = (roundedLog2 - integerPart) * 10;
+                    const letterCode = String.fromCharCode('A'.charCodeAt(0) + (integerPart - 10));
+                    formattedTime = `${letterCode}.${decimalPart.toFixed(0)} [log2]min`;
+                } else {
+                    formattedTime = `${roundedLog2} [log2]min`;
+                }
+                
+                return formattedTime;
+            }
+
+            // Start the app logic
+            initApp();
+        });
+    </script>
+</body>
+</html>

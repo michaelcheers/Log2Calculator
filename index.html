@@ -35,7 +35,7 @@
             margin-top: 1.5rem;
         }
 
-        input[type="file"], input[type="text"], button {
+        input[type="file"], button {
             width: calc(100% - 20px);
             padding: 10px;
             margin: 8px 0;
@@ -77,15 +77,11 @@
         <h1>Log2calendar</h1>
         <p>A minimalist calendar dashboard using logarithmic time units.</p>
 
+        <!-- Authentication section -->
         <div id="auth-section">
-            <p>Please upload your Google OAuth client credentials JSON file.</p>
+            <p>Please upload your Google OAuth client credentials JSON file to get started.</p>
             <input type="file" id="credentials-file-input" accept=".json">
-            <button id="authenticate-button">Authenticate</button>
-            <div id="auth-info" style="display:none;">
-                <p>Follow the Google OAuth flow. When redirected, copy the full URL and paste it below:</p>
-                <input type="text" id="redirect-url-input" placeholder="Paste redirect URL here">
-                <button id="process-token-button">Process Token</button>
-            </div>
+            <button id="authenticate-button">Authenticate with Google</button>
         </div>
 
         <div id="events-dashboard" style="display:none;">
@@ -98,22 +94,31 @@
         document.addEventListener('DOMContentLoaded', () => {
             const credentialsFileInput = document.getElementById('credentials-file-input');
             const authenticateButton = document.getElementById('authenticate-button');
-            const authInfo = document.getElementById('auth-info');
-            const redirectUrlInput = document.getElementById('redirect-url-input');
-            const processTokenButton = document.getElementById('process-token-button');
             const authSection = document.getElementById('auth-section');
             const eventsDashboard = document.getElementById('events-dashboard');
             const eventList = document.getElementById('event-list');
 
-            const redirectUri = 'https://localhost:2853';
+            const redirectUri = 'https://michaelcheers.github.io/Log2Calendar';
             const googleAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
 
             let clientId = localStorage.getItem('googleClientId');
             let accessToken = localStorage.getItem('googleAccessToken');
 
-            // Show the next step if credentials are already stored
-            if (clientId) {
-                authInfo.style.display = 'block';
+            // Function to check for an access token in the URL hash on page load
+            function checkUrlForToken() {
+                const fragment = window.location.hash.substring(1);
+                const params = new URLSearchParams(fragment);
+                const token = params.get('access_token');
+                
+                if (token) {
+                    localStorage.setItem('googleAccessToken', token);
+                    accessToken = token;
+                    // Clean the URL hash to prevent re-authentication
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    initApp();
+                    return true;
+                }
+                return false;
             }
 
             // Event listener for reading and saving the JSON credentials file
@@ -132,7 +137,6 @@
                         
                         if (clientId) {
                             localStorage.setItem('googleClientId', clientId);
-                            authInfo.style.display = 'block';
                             initiateOAuthFlow(clientId);
                         } else {
                             alert('Invalid credentials file format. Please ensure it contains "web.client_id".');
@@ -144,26 +148,6 @@
                 reader.readAsText(file);
             });
 
-            // Event listener for processing the redirect URL and extracting the token
-            processTokenButton.addEventListener('click', () => {
-                const url = redirectUrlInput.value;
-                try {
-                    const fragment = new URL(url).hash;
-                    const params = new URLSearchParams(fragment.substring(1));
-                    const token = params.get('access_token');
-                    if (token) {
-                        localStorage.setItem('googleAccessToken', token);
-                        accessToken = token;
-                        alert('Authentication successful!');
-                        initApp();
-                    } else {
-                        alert('Could not find access token in URL fragment.');
-                    }
-                } catch (e) {
-                    alert('Invalid URL format.');
-                }
-            });
-
             // Main function to check for tokens and start the app
             function initApp() {
                 if (accessToken) {
@@ -172,6 +156,9 @@
                     fetchCalendarEvents();
                     // Refresh every minute to update the time
                     setInterval(fetchCalendarEvents, 60 * 1000);
+                } else if (clientId) {
+                    // Show a message if client ID is set but token isn't, and trigger auth
+                    alert('Please click the "Authenticate with Google" button to complete the sign-in process.');
                 }
             }
 
@@ -179,7 +166,7 @@
             function initiateOAuthFlow(clientId) {
                 const scope = 'https://www.googleapis.com/auth/calendar.readonly';
                 const authUrl = `${googleAuthUrl}?response_type=token&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
-                window.open(authUrl, '_blank');
+                window.location.href = authUrl;
             }
 
             // Function to fetch events from Google Calendar
@@ -220,12 +207,12 @@
                 
                 // Filter and sort events
                 const upcomingEvents = events.filter(event => {
-                    const startTime = new Date(event.start.dateTime);
+                    const startTime = new Date(event.start.dateTime || event.start.date);
                     return startTime > now;
-                }).sort((a, b) => new Date(a.start.dateTime) - new Date(b.start.dateTime));
+                }).sort((a, b) => new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date));
 
                 upcomingEvents.forEach(event => {
-                    const startTime = new Date(event.start.dateTime);
+                    const startTime = new Date(event.start.dateTime || event.start.date);
                     const logTime = calculateLog2Time(now, startTime);
                     const listItem = document.createElement('li');
                     listItem.textContent = `${logTime} left for: ${event.summary}`;
@@ -262,8 +249,10 @@
                 return formattedTime;
             }
 
-            // Start the app logic
-            initApp();
+            // Initial check for the token and start the app
+            if (!checkUrlForToken()) {
+                initApp();
+            }
         });
     </script>
 </body>

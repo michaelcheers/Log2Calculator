@@ -109,11 +109,10 @@
             const googleAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
 
             let clientId = localStorage.getItem('googleClientId');
-            let clientSecret = localStorage.getItem('googleClientSecret');
             let accessToken = localStorage.getItem('googleAccessToken');
 
             // Show the next step if credentials are already stored
-            if (clientId && clientSecret) {
+            if (clientId) {
                 authInfo.style.display = 'block';
             }
 
@@ -129,19 +128,17 @@
                 reader.onload = (event) => {
                     try {
                         const credentials = JSON.parse(event.target.result);
-                        clientId = credentials.client_id;
-                        clientSecret = credentials.client_secret;
-
-                        if (clientId && clientSecret) {
+                        clientId = credentials.web.client_id;
+                        
+                        if (clientId) {
                             localStorage.setItem('googleClientId', clientId);
-                            localStorage.setItem('googleClientSecret', clientSecret);
                             authInfo.style.display = 'block';
                             initiateOAuthFlow(clientId);
                         } else {
-                            alert('Invalid credentials file format. Please ensure it contains client_id and client_secret.');
+                            alert('Invalid credentials file format. Please ensure it contains "web.client_id".');
                         }
                     } catch (e) {
-                        alert('Failed to parse JSON file.');
+                        alert('Failed to parse JSON file or find credentials at "web.client_id".');
                     }
                 };
                 reader.readAsText(file);
@@ -221,14 +218,18 @@
                 eventList.innerHTML = ''; // Clear previous events
                 const now = new Date();
                 
-                events.forEach(event => {
+                // Filter and sort events
+                const upcomingEvents = events.filter(event => {
                     const startTime = new Date(event.start.dateTime);
-                    if (startTime > now) {
-                        const logTime = calculateLog2Time(now, startTime);
-                        const listItem = document.createElement('li');
-                        listItem.textContent = `${logTime} left for: ${event.summary}`;
-                        eventList.appendChild(listItem);
-                    }
+                    return startTime > now;
+                }).sort((a, b) => new Date(a.start.dateTime) - new Date(b.start.dateTime));
+
+                upcomingEvents.forEach(event => {
+                    const startTime = new Date(event.start.dateTime);
+                    const logTime = calculateLog2Time(now, startTime);
+                    const listItem = document.createElement('li');
+                    listItem.textContent = `${logTime} left for: ${event.summary}`;
+                    eventList.appendChild(listItem);
                 });
                 
                 if (eventList.children.length === 0) {

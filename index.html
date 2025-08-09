@@ -200,8 +200,11 @@
                             'Authorization': `Bearer ${accessToken}`
                         }
                     });
+                    if (!response.ok) {
+                        throw new Error(`HTTP error ${response.status}`);
+                    }
                     const data = await response.json();
-                    
+
                     if (data.items) {
                         displayEvents(data.items);
                     } else {

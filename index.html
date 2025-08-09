@@ -104,6 +104,15 @@
             let clientId = localStorage.getItem('googleClientId');
             let accessToken = localStorage.getItem('googleAccessToken');
 
+            // If a client ID is already stored, hide the file input since re-upload isn't needed
+            if (clientId) {
+                credentialsFileInput.style.display = 'none';
+                const authMessage = authSection.querySelector('p');
+                if (authMessage) {
+                    authMessage.textContent = 'Click the "Authenticate with Google" button to continue.';
+                }
+            }
+
             // Function to check for an access token in the URL hash on page load
             function checkUrlForToken() {
                 const fragment = window.location.hash.substring(1);
@@ -123,6 +132,12 @@
 
             // Event listener for reading and saving the JSON credentials file
             authenticateButton.addEventListener('click', () => {
+                // If a client ID is already stored, use it directly
+                if (clientId) {
+                    initiateOAuthFlow(clientId);
+                    return;
+                }
+
                 const file = credentialsFileInput.files[0];
                 if (!file) {
                     alert('Please select a JSON file to upload.');
@@ -134,9 +149,10 @@
                     try {
                         const credentials = JSON.parse(event.target.result);
                         clientId = credentials.web.client_id;
-                        
+
                         if (clientId) {
                             localStorage.setItem('googleClientId', clientId);
+                            credentialsFileInput.style.display = 'none';
                             initiateOAuthFlow(clientId);
                         } else {
                             alert('Invalid credentials file format. Please ensure it contains "web.client_id".');
@@ -157,8 +173,8 @@
                     // Refresh every minute to update the time
                     setInterval(fetchCalendarEvents, 60 * 1000);
                 } else if (clientId) {
-                    // Show a message if client ID is set but token isn't, and trigger auth
-                    alert('Please click the "Authenticate with Google" button to complete the sign-in process.');
+                    authSection.style.display = 'block';
+                    eventsDashboard.style.display = 'none';
                 }
             }
 

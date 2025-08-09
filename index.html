@@ -102,10 +102,10 @@
             const googleAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
 
             let clientId = localStorage.getItem('googleClientId');
+            let clientSecret = localStorage.getItem('googleClientSecret');
             let accessToken = localStorage.getItem('googleAccessToken');
 
-            // If a client ID is already stored, hide the file input since re-upload isn't needed
-            if (clientId) {
+            if (clientId && clientSecret) {
                 credentialsFileInput.style.display = 'none';
                 const authMessage = authSection.querySelector('p');
                 if (authMessage) {
@@ -132,8 +132,7 @@
 
             // Event listener for reading and saving the JSON credentials file
             authenticateButton.addEventListener('click', () => {
-                // If a client ID is already stored, use it directly
-                if (clientId) {
+                if (clientId && clientSecret) {
                     initiateOAuthFlow(clientId);
                     return;
                 }
@@ -149,16 +148,18 @@
                     try {
                         const credentials = JSON.parse(event.target.result);
                         clientId = credentials.web.client_id;
+                        clientSecret = credentials.web.client_secret;
 
-                        if (clientId) {
+                        if (clientId && clientSecret) {
                             localStorage.setItem('googleClientId', clientId);
+                            localStorage.setItem('googleClientSecret', clientSecret);
                             credentialsFileInput.style.display = 'none';
                             initiateOAuthFlow(clientId);
                         } else {
-                            alert('Invalid credentials file format. Please ensure it contains "web.client_id".');
+                            alert('Invalid credentials file format. Please ensure it contains "web.client_id" and "web.client_secret".');
                         }
                     } catch (e) {
-                        alert('Failed to parse JSON file or find credentials at "web.client_id".');
+                        alert('Failed to parse JSON file or find credentials at "web.client_id" and "web.client_secret".');
                     }
                 };
                 reader.readAsText(file);
@@ -172,7 +173,7 @@
                     fetchCalendarEvents();
                     // Refresh every minute to update the time
                     setInterval(fetchCalendarEvents, 60 * 1000);
-                } else if (clientId) {
+                } else if (clientId && clientSecret) {
                     authSection.style.display = 'block';
                     eventsDashboard.style.display = 'none';
                 }

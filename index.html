@@ -105,7 +105,6 @@
             let clientSecret = localStorage.getItem('googleClientSecret');
             let accessToken = localStorage.getItem('googleAccessToken');
 
-            // If credentials are already stored, hide the file input since re-upload isn't needed
             if (clientId && clientSecret) {
                 credentialsFileInput.style.display = 'none';
                 const authMessage = authSection.querySelector('p');
@@ -133,7 +132,6 @@
 
             // Event listener for reading and saving the JSON credentials file
             authenticateButton.addEventListener('click', () => {
-                // If credentials are already stored, use them directly
                 if (clientId && clientSecret) {
                     initiateOAuthFlow(clientId);
                     return;

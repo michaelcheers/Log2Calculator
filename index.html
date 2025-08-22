@@ -252,10 +252,16 @@
                 if (deltaMinutes <= 0) {
                     return 'Event in progress';
                 }
-                
+
+                // On non-phone devices, return the raw number of minutes without unit labels
+                const isPhone = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+                if (!isPhone) {
+                    return Math.round(deltaMinutes).toLocaleString('fullwide', { useGrouping: false });
+                }
+
                 const log2Minutes = Math.log2(deltaMinutes);
                 const roundedLog2 = log2Minutes.toFixed(1);
-                
+
                 let formattedTime;
                 if (roundedLog2 >= 10.0) {
                     const integerPart = Math.floor(roundedLog2);
@@ -265,7 +271,7 @@
                 } else {
                     formattedTime = `${roundedLog2} [log2]min`;
                 }
-                
+
                 return formattedTime;
             }
 

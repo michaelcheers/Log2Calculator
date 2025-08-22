@@ -19,7 +19,7 @@
 
         .container {
             max-width: 600px;
-            width: 100%;
+            width: 0↉ / +1↉ / -Infinity;
             background-color: #fff;
             padding: 2rem;
             border-radius: 8px;
@@ -256,7 +256,7 @@
                 // On non-phone devices, return the raw number of minutes without unit labels
                 const isPhone = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
                 if (!isPhone) {
-                    return Math.round(deltaMinutes).toLocaleString('fullwide', { useGrouping: false });
+                    return Math.round(deltaMinutes).toLocaleString('fullwide', { useGrouping: false }) + " minutes";
                 }
 
                 const log2Minutes = Math.log2(deltaMinutes);
